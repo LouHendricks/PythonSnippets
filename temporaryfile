@@ -1,0 +1,93 @@
+import os
+import tempfile
+
+class TemporaryFile:
+    """
+    A wrapper class for managing temporary files consistently across platforms.
+
+    Args:
+        name (str): The name of the temporary file.
+        io (file-like object): The underlying file object.
+        delete (bool): Whether to delete the file when the object is garbage collected.
+
+    Attributes:
+        name (str): The name of the temporary file.
+        __io (file-like object): The underlying file object.
+        __delete (bool): Whether to delete the file when the object is garbage collected.
+
+    Methods:
+        is_open(): Checks if the file is open or closed.
+
+    Example usage:
+        x = NamedTemporaryFile("w")
+        x.write("hello")
+        x.close()
+        print(f"Is the file open? {x.is_open()}")
+    """
+
+    def __init__(self, name, io, delete):
+        self.name = name
+        self.__io = io
+        self.__delete = delete
+
+    def __getattr__(self, k):
+        return getattr(self.__io, k)
+
+    def is_open(self):
+        """
+        Checks whether the file is open or closed.
+
+        Returns:
+            bool: True if the file is open, False if closed.
+        """
+        return not self.__io.closed
+
+    def __del__(self):
+        if self.__delete:
+            try:
+                os.unlink(self.name)
+            except FileNotFoundError:
+                pass
+
+def NamedTemporaryFile(mode='w+b', bufsize=-1, suffix='', prefix='tmp', dir=None, delete=True):
+    """
+    Creates a named temporary file.
+
+    Args:
+        mode (str): File mode (default: 'w+b').
+        bufsize (int): Buffer size (default: -1).
+        suffix (str): Suffix for the temporary file (default: '').
+        prefix (str): Prefix for the temporary file (default: 'tmp').
+        dir (str): Directory for the temporary file (default: system temp directory).
+        delete (bool): Whether to delete the file when the object is garbage collected (default: True).
+
+    Returns:
+        TemporaryFile: A wrapper for the temporary file.
+    """
+    if not dir:
+        dir = tempfile.gettempdir()
+    name = os.path.join(dir, prefix + os.urandom(32).hex() + suffix)
+
+    if mode is None:
+        return TemporaryFile(name, None, delete)
+
+    fh = open(name, "w+b", bufsize)
+    if mode != "w+b":
+        fh.close()
+        fh = open(name, mode)
+
+    return TemporaryFile(name, fh, delete)
+
+# Example usage
+def test_named_temporary_file():
+    x = NamedTemporaryFile("w")
+    x.write("hello")
+    x.close()
+
+    assert os.path.exists(x.name)
+    with open(x.name) as f:
+        assert f.read() == "hello"
+
+    print(f"Is the file open? {x.is_open()}")
+
+test_named_temporary_file()
